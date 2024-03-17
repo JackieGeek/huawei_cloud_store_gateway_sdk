@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 require_relative "huawei_cloud_store_gateway_sdk/version"
-require 'uri'
-require 'digest'
-require 'openssl'
+require "uri"
+require "digest"
+require "openssl"
 module HuaweiCloudStoreGatewaySdk
-  extend self
+  module_function
 
   class Error < StandardError; end
 
@@ -17,7 +17,8 @@ module HuaweiCloudStoreGatewaySdk
   class HwStoreSDK
     attr_accessor :method, :uri, :headers, :body, :query, :app_key, :app_secret
 
-    def initialize(method, uri, headers = {}, body = "", app_key, app_secret)
+    # rubocop: disable Metrics/ParameterLists
+    def initialize(method, uri, headers, app_key, app_secret, body)
       @method = method
       @uri = URI(uri)
       @headers = headers.transform_keys(&:to_s)
@@ -34,9 +35,9 @@ module HuaweiCloudStoreGatewaySdk
     end
   end
 
-  def sign_request(method, uri, headers, app_key, app_secret, body = "")
-    request = HwStoreSDK.new(method, uri, headers, body, app_key, app_secret)
-    sign_headers_for_request(request)
+  def sign_request(method, uri, headers, app_key, app_secret, body)
+    request = HwStoreSDK.new(method, uri, headers, app_key, app_secret, body)
+    sign_headers(request)
     {
       url: request.full_path,
       headers: request.headers,
@@ -44,11 +45,10 @@ module HuaweiCloudStoreGatewaySdk
     }
   end
 
-  def sign_headers_for_request(request)
-    current_time = request.headers[HEADER_X_DATE].nil? ? current_utc_time : request.headers[HEADER_X_DATE]
-    request.headers[HEADER_X_DATE] = current_time
-    request.headers[HOST] = request.uri.host
-    canonical_request_str = canonical_request(request)
+  # rubocop: enable Metrics/ParameterLists
+
+  def sign_headers(request)
+    canonical_request_str, current_time = request_to_string(request)
     string_to_sign = string_to_sign(canonical_request_str, current_time)
     signature = calculate_signature(request.app_secret, string_to_sign)
     request.headers[HEADER_AUTHORIZATION] = auth_header_value(request.app_key, signature, signed_headers(request))
@@ -107,7 +107,7 @@ module HuaweiCloudStoreGatewaySdk
   end
 
   def auth_header_value(app_key, signature, signed_headers)
-    "#{ALGORITHM} Access=#{app_key}, SignedHeaders=#{signed_headers.join(';')}, Signature=#{signature}"
+    "#{ALGORITHM} Access=#{app_key}, SignedHeaders=#{signed_headers.join(";")}, Signature=#{signature}"
   end
 
   def current_utc_time
@@ -116,5 +116,13 @@ module HuaweiCloudStoreGatewaySdk
 
   def url_encode(str)
     URI.encode_www_form_component(str)
+  end
+
+  def request_to_string(request)
+    current_time = request.headers[HEADER_X_DATE].nil? ? current_utc_time : request.headers[HEADER_X_DATE]
+    request.headers[HEADER_X_DATE] = current_time
+    request.headers[HOST] = request.uri.host
+    canonical_request_str = canonical_request(request)
+    [canonical_request_str, current_time]
   end
 end
