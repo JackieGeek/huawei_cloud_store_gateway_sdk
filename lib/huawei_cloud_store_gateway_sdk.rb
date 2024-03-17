@@ -1,11 +1,21 @@
 # frozen_string_literal: true
 
 require_relative "huawei_cloud_store_gateway_sdk/version"
+require 'huawei_cloud_store_gateway_sdk/configuration'
 require "uri"
 require "digest"
 require "openssl"
 module HuaweiCloudStoreGatewaySdk
   module_function
+
+  class << self
+    attr_accessor :configuration
+  end
+
+  def configure
+    self.configuration ||= HuaweiCloudStoreGatewaySdk::Configuration.new
+    yield(configuration)
+  end
 
   class Error < StandardError; end
 
